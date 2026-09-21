@@ -1,0 +1,180 @@
+<!-- ============================================================
+  CARTRACK LP · BLOK 00 · SKRYPT CEN (bez stylów – każda sekcja ma własne)
+  Wklej JEDEN raz: w ustawieniach strony (kod w <head> lub przed </body>)
+  albo jako dowolny blok HTML. Tu ustawiasz RABAT i ADRES_DANYCH.
+  Wymagany dla mapy (03) i kalkulatora (06); pozostałe sekcje bez niego
+  pokażą ceny wpisane na sztywno w HTML.
+
+  Ceny: pobierz_ceny.py sprawdza AutoCentrum.pl 1x dziennie (GitHub Actions)
+  i przy zmianie nadpisuje ceny.json pod adresem ADRES_DANYCH.
+  Pole „data” = dzień ostatniej zmiany cen („ceny na dzień …”).
+============================================================ -->
+<script>
+(function () {
+  /* ==========================================================
+     USTAWIENIA – jedyne miejsce, które edytujesz
+  ========================================================== */
+  var USTAWIENIA = {
+    /* Rabat Cartrack w zł/l. Cena za paliwo z systemem Cartrack =
+       średnia cena − RABAT. Może go też nadpisać wiersz „rabat” w arkuszu. */
+    RABAT: 1.00,
+
+    /* Adres z aktualnymi cenami (ceny.json generowany przez pobierz_ceny.py).
+       Pusty = strona pokazuje ceny zapisane poniżej. */
+    ADRES_DANYCH: "https://bczarnecki-beep.github.io/scrypt_paliwa/ceny.json",
+
+    /* Co ile minut odświeżać ceny u osoby, która ma stronę otwartą (0 = tylko przy wejściu). */
+    ODSWIEZ_CO_MIN: 0
+  };
+
+  /* Ceny awaryjne: pokazywane, gdy ADRES_DANYCH jest pusty albo nie odpowiada.
+     Kolejność: Pb95, Pb98, ON. null = brak notowań. */
+  var dane = {
+    data: "2026-09-21",
+    rabat: USTAWIENIA.RABAT,
+    polska: [7.86, 8.38, 8.84],
+    regiony: {
+      "dolnośląskie": [7.97, 8.51, 8.89], "kujawsko-pomorskie": [7.82, 8.81, 8.78],
+      "lubelskie": [7.98, 8.44, 8.91], "lubuskie": [7.29, null, null],
+      "łódzkie": [7.85, 8.08, 9.12], "małopolskie": [7.84, 8.31, 8.58],
+      "mazowieckie": [7.97, 8.42, 8.93], "opolskie": [7.84, 8.59, 8.67],
+      "podkarpackie": [7.80, 8.50, 8.00], "podlaskie": [7.86, null, 8.92],
+      "pomorskie": [7.82, 8.39, 8.89], "śląskie": [7.76, 7.91, 8.86],
+      "świętokrzyskie": [7.79, null, 9.00], "warmińsko-mazurskie": [null, null, 9.01],
+      "wielkopolskie": [7.91, 8.48, 8.62], "zachodniopomorskie": [7.86, 8.53, 8.86]
+    },
+    teksty: {}
+  };
+
+  /* ==========================================================
+     SILNIK – poniżej nic nie trzeba zmieniać
+  ========================================================== */
+  var KLUCZE = ["pb95", "pb98", "on"];
+  var sluchacze = [];
+
+  function fmt(v) { return v == null || isNaN(v) ? "—" : Number(v).toFixed(2).replace(".", ","); }
+  function zCartrack(v) { return v == null ? null : Math.max(0, Math.round((v - dane.rabat) * 100) / 100); }
+  function kwota(n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+  function dataPL(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
+    return m ? m[3] + "." + m[2] + "." + m[1] : (iso || "");
+  }
+  function liczba(s) {
+    if (s == null) return null;
+    var t = String(s).replace(/\s|zł|\/l/gi, "").replace(",", ".");
+    if (t === "" || t === "-" || t === "—") return null;
+    var n = parseFloat(t);
+    return isFinite(n) && n > 0.5 && n < 30 ? n : null;   /* bezpiecznik na literówki */
+  }
+  function idx(paliwo) { return typeof paliwo === "number" ? paliwo : KLUCZE.indexOf(String(paliwo).toLowerCase()); }
+
+  function najtaniej(i) {
+    var best = null;
+    Object.keys(dane.regiony).forEach(function (r) {
+      var p = dane.regiony[r][i];
+      if (p != null && (best == null || p < best.cena)) best = { region: r, cena: p };
+    });
+    return best;
+  }
+
+  /* Proste podpięcia w HTML: data-ct-cena="on", data-ct-cartrack="on",
+     data-ct-data, data-ct-rabat, data-ct-najtaniej-region="pb95" itd. */
+  function wypelnij() {
+    var q = function (sel, fn) { Array.prototype.forEach.call(document.querySelectorAll(sel), fn); };
+    q("[data-ct-cena]", function (el) { el.textContent = fmt(dane.polska[idx(el.getAttribute("data-ct-cena"))]); });
+    q("[data-ct-cartrack]", function (el) { el.textContent = fmt(zCartrack(dane.polska[idx(el.getAttribute("data-ct-cartrack"))])); });
+    q("[data-ct-data]", function (el) { el.textContent = dataPL(dane.data); });
+    q("[data-ct-rabat]", function (el) { el.textContent = fmt(dane.rabat); });
+    q("[data-ct-najtaniej-region]", function (el) { var b = najtaniej(idx(el.getAttribute("data-ct-najtaniej-region"))); el.textContent = b ? b.region : "—"; });
+    q("[data-ct-najtaniej-cena]", function (el) { var b = najtaniej(idx(el.getAttribute("data-ct-najtaniej-cena"))); el.textContent = b ? fmt(b.cena) : "—"; });
+    q("[data-ct-najtaniej-cartrack]", function (el) { var b = najtaniej(idx(el.getAttribute("data-ct-najtaniej-cartrack"))); el.textContent = b ? fmt(zCartrack(b.cena)) : "—"; });
+    q("[data-ct-tekst]", function (el) { var t = dane.teksty[el.getAttribute("data-ct-tekst")]; if (t) el.textContent = t; });
+  }
+
+  function oglos() {
+    wypelnij();
+    sluchacze.forEach(function (fn) { try { fn(dane); } catch (e) { if (window.console) console.error("[Cartrack LP]", e); } });
+  }
+
+  /* --- wczytywanie CSV / JSON --- */
+  function parsujCSV(txt) {
+    var rows = [], row = [], cell = "", q = false, c, i;
+    var sep = (txt.split("\n")[0].indexOf(";") > -1) ? ";" : ",";   /* Arkusze Google: przecinek, Excel PL: średnik */
+    for (i = 0; i < txt.length; i++) {
+      c = txt[i];
+      if (q) { if (c === '"') { if (txt[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+      else if (c === '"') q = true;
+      else if (c === sep) { row.push(cell); cell = ""; }
+      else if (c === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; }
+      else if (c !== "\r") cell += c;
+    }
+    if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+  }
+
+  function zastosuj(nowe) {
+    var zmiana = false;
+    if (nowe.polska && nowe.polska.some(function (v) { return v != null; })) {
+      dane.polska = KLUCZE.map(function (_, i) { return nowe.polska[i] != null ? nowe.polska[i] : dane.polska[i]; });
+      zmiana = true;
+    }
+    Object.keys(nowe.regiony || {}).forEach(function (r) {
+      if (dane.regiony[r]) { dane.regiony[r] = nowe.regiony[r]; zmiana = true; }
+    });
+    if (nowe.rabat != null && nowe.rabat >= 0 && nowe.rabat < 5) { dane.rabat = nowe.rabat; zmiana = true; }
+    if (nowe.data) { dane.data = nowe.data; zmiana = true; }
+    Object.keys(nowe.teksty || {}).forEach(function (k) { dane.teksty[k] = nowe.teksty[k]; zmiana = true; });
+    if (zmiana) oglos();
+  }
+
+  function zCSV(txt) {
+    var out = { regiony: {}, teksty: {} };
+    parsujCSV(txt).forEach(function (r) {
+      var k = (r[0] || "").trim().toLowerCase();
+      if (!k || k === "region" || k === "klucz") return;
+      if (k === "data") { out.data = (r[1] || "").trim(); return; }
+      if (k === "rabat") { var rb = parseFloat(String(r[1]).replace(",", ".")); if (isFinite(rb)) out.rabat = rb; return; }
+      if (k.indexOf("tekst:") === 0) { out.teksty[k.slice(6).trim()] = (r[1] || "").trim(); return; }
+      var ceny = [liczba(r[1]), liczba(r[2]), liczba(r[3])];   /* ewentualne dalsze kolumny są pomijane */
+      if (k === "polska") out.polska = ceny; else out.regiony[k] = ceny;
+    });
+    return out;
+  }
+
+  function zJSON(o) {
+    var out = { regiony: {}, teksty: o.teksty || {}, data: o.data };
+    if (o.rabat != null) out.rabat = Number(o.rabat);
+    if (o.polska) out.polska = o.polska.slice(0, 3).map(liczba);
+    Object.keys(o.regiony || {}).forEach(function (r) { out.regiony[r.toLowerCase()] = o.regiony[r].slice(0, 3).map(liczba); });
+    return out;
+  }
+
+  function pobierz() {
+    if (!USTAWIENIA.ADRES_DANYCH || !window.fetch) return;
+    var url = USTAWIENIA.ADRES_DANYCH + (USTAWIENIA.ADRES_DANYCH.indexOf("?") > -1 ? "&" : "?") + "_=" + Date.now();
+    fetch(url).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+      .then(function (t) { t = t.trim(); zastosuj(t.charAt(0) === "{" ? zJSON(JSON.parse(t)) : zCSV(t)); })
+      .catch(function (e) { if (window.console) console.warn("[Cartrack LP] Nie udało się pobrać cen, zostają ceny awaryjne.", e); });
+  }
+
+  var API = {
+    paliwa: KLUCZE, nazwy: ["Pb95", "Pb98", "Diesel ON"],
+    fmt: fmt, kwota: kwota, zCartrack: zCartrack, najtaniej: najtaniej, dataPL: dataPL,
+    dane: function () { return dane; },
+    naZmiane: function (fn) { sluchacze.push(fn); fn(dane); },
+    odswiez: pobierz
+  };
+
+  /* Sekcje zgłaszają się przez kolejkę, więc kolejność bloków na stronie nie ma znaczenia. */
+  function start() {
+    var kolejka = window.CTLP_Q || [];
+    window.CTLP_Q = { push: function (fn) { fn(API); } };
+    kolejka.forEach(function (fn) { fn(API); });
+    wypelnij();
+    pobierz();
+    if (USTAWIENIA.ODSWIEZ_CO_MIN > 0) setInterval(pobierz, USTAWIENIA.ODSWIEZ_CO_MIN * 60000);
+  }
+  window.CTLP = API;
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
+})();
+</script>
