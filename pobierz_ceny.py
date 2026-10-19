@@ -36,6 +36,7 @@ WOJEWODZTWA = [
 
 CENA_MIN, CENA_MAX = 3.0, 15.0      # zł/l – wszystko poza zakresem traktujemy jak błąd odczytu
 MIN_WOJEWODZTW_Z_CENA = 10          # mniej = strona źródłowa się zmieniła albo ma awarię
+MAX_BRAKUJACYCH_WOJEWODZTW = 3      # więcej brakujących wierszy = strona źródłowa się zmieniła
 DNI_BEZ_ZMIAN_ALARM = 7             # tyle dni bez żadnej zmiany cen = podejrzenie, że źródło stanęło
 
 
@@ -98,8 +99,11 @@ def sprawdz(polska, regiony):
     if any(v is None for v in polska):
         raise BladDanych("Brak średniej krajowej dla któregoś paliwa: %r" % (polska,))
     brakujace = [w for w in WOJEWODZTWA if w not in regiony]
-    if brakujace:
+    if len(brakujace) > MAX_BRAKUJACYCH_WOJEWODZTW:
         raise BladDanych("Brak województw w tabeli: " + ", ".join(brakujace))
+    for w in brakujace:                 # AutoCentrum czasem pomija województwo bez notowań
+        print("Uwaga: brak wiersza dla województwa %s – zapisuję jako brak notowań." % w)
+        regiony[w] = [None, None, None]
     z_cena = sum(1 for c in regiony.values() if any(v is not None for v in c))
     if z_cena < MIN_WOJEWODZTW_Z_CENA:
         raise BladDanych("Tylko %d województw ma jakąkolwiek cenę." % z_cena)
