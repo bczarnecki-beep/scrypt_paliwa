@@ -1,90 +1,90 @@
 {
-  "data": "2026-10-19",
+  "data": "2026-10-20",
   "zrodlo": "AutoCentrum.pl",
   "polska": [
-    6.78,
-    7.29,
-    7.8
+    6.75,
+    7.21,
+    7.79
   ],
   "regiony": {
     "dolnośląskie": [
-      6.77,
+      6.76,
       7.61,
-      7.68
+      7.63
     ],
     "kujawsko-pomorskie": [
-      7.48,
+      null,
       7.38,
-      7.78
+      8.21
     ],
     "lubelskie": [
-      6.77,
-      7.42,
-      7.98
+      6.82,
+      6.89,
+      7.97
     ],
     "lubuskie": [
-      6.76,
+      6.75,
       null,
       null
     ],
     "łódzkie": [
-      6.69,
-      7.41,
-      8.0
+      6.66,
+      7.15,
+      7.71
     ],
     "małopolskie": [
-      6.82,
+      6.81,
       7.52,
       7.92
     ],
     "mazowieckie": [
-      6.75,
+      6.77,
       7.13,
-      7.76
+      7.79
     ],
     "opolskie": [
       null,
       null,
-      null
+      7.0
     ],
     "podkarpackie": [
-      6.69,
+      6.72,
       null,
       7.71
     ],
     "podlaskie": [
-      null,
-      null,
+      6.7,
+      7.66,
       null
     ],
     "pomorskie": [
-      6.68,
+      6.72,
       7.24,
       7.8
     ],
     "śląskie": [
-      6.73,
-      7.09,
-      7.8
+      6.69,
+      7.16,
+      7.77
     ],
     "świętokrzyskie": [
       6.57,
-      null,
-      7.32
+      6.89,
+      7.48
     ],
     "warmińsko-mazurskie": [
-      6.99,
-      6.95,
+      6.92,
+      6.89,
       7.87
     ],
     "wielkopolskie": [
-      6.84,
-      7.79,
-      7.78
+      6.82,
+      7.76,
+      7.75
     ],
     "zachodniopomorskie": [
-      6.77,
-      7.67,
+      6.79,
+      7.69,
       7.78
     ]
   }
