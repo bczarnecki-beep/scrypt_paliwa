@@ -2,7 +2,9 @@ name: Aktualizuj ceny paliw
 
 on:
   schedule:
-    - cron: "30 4 * * *"   # codziennie 04:30 UTC = 6:30 (lato) / 5:30 (zima) czasu polskiego
+    - cron: "30 4 * * *"   # 04:30 UTC = 6:30 (lato) / 5:30 (zima) czasu polskiego
+    - cron: "30 10 * * *"  # dodatkowe sprawdzenia: gdy rano źródło nie działało
+    - cron: "30 15 * * *"  # albo ceny zmieniły się w ciągu dnia (zapis tylko przy zmianie)
   workflow_dispatch:        # przycisk „Run workflow” – ręczne uruchomienie
 
 permissions:

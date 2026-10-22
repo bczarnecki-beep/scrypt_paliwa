@@ -16,6 +16,8 @@ import html
 import json
 import re
 import sys
+import time
+import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -37,6 +39,8 @@ WOJEWODZTWA = [
 CENA_MIN, CENA_MAX = 3.0, 15.0      # zł/l – wszystko poza zakresem traktujemy jak błąd odczytu
 MIN_WOJEWODZTW_Z_CENA = 10          # mniej = strona źródłowa się zmieniła albo ma awarię
 MAX_BRAKUJACYCH_WOJEWODZTW = 3      # więcej brakujących wierszy = strona źródłowa się zmieniła
+DNI_NIEDOSTEPNOSCI_ALARM = 2        # źródło nie działa, a ostatnie ceny mają tyle dni = e-mail z GitHuba
+PROBY, PAUZA_S = 3, 60              # ponowne próby przy chwilowej awarii źródła
 DNI_BEZ_ZMIAN_ALARM = 7             # tyle dni bez żadnej zmiany cen = podejrzenie, że źródło stanęło
 
 
@@ -169,21 +173,49 @@ def zapisz_historie(data, polska, regiony):
         out.writerows(wiersze)
 
 
-def main():
+def pobierz_z_ponowieniem(url):
+    """Kilka prób przy błędach serwera (5xx) i sieci. Rzuca ostatni błąd, gdy wszystkie zawiodą."""
+    for proba in range(1, PROBY + 1):
+        try:
+            return pobierz_html(url)
+        except urllib.error.HTTPError as e:
+            if e.code < 500 or proba == PROBY:
+                raise
+            blad = e
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            if proba == PROBY:
+                raise
+            blad = e
+        print("Próba %d/%d nieudana (%s), ponawiam za %d s." % (proba, PROBY, blad, PAUZA_S))
+        time.sleep(PAUZA_S)
+
+
+def dni_od(data_iso):
     try:
-        polska, regiony = parsuj(pobierz_html(ADRES_ZRODLA))
+        return (datetime.fromisoformat(dzisiaj()) - datetime.fromisoformat(data_iso)).days
+    except (TypeError, ValueError):
+        return 0
+
+
+def main():
+    stare = wczytaj_poprzednie()
+    try:
+        strona = pobierz_z_ponowieniem(ADRES_ZRODLA)
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+        # Źródło chwilowo nie działa (np. „Przerwa techniczna” – HTTP 503). Strona pokazuje ostatnie ceny.
+        ostatnie = (stare or {}).get("data")
+        print("ŹRÓDŁO NIEDOSTĘPNE: %s – ceny.json bez zmian (ostatnie ceny z %s)." % (e, ostatnie), file=sys.stderr)
+        return 1 if dni_od(ostatnie) >= DNI_NIEDOSTEPNOSCI_ALARM else 0
+    try:
+        polska, regiony = parsuj(strona)
         sprawdz(polska, regiony)
     except Exception as e:
         print("BŁĄD: %s\nceny.json pozostaje bez zmian." % e, file=sys.stderr)
         return 1
-    stare = wczytaj_poprzednie()
     roznice = zmiany(stare, polska, regiony)
     if not roznice:
         print("BEZ ZMIAN – ceny takie same jak w odczycie z %s, nic nie zapisuję." % stare.get("data"))
-        try:
-            dni = (datetime.fromisoformat(dzisiaj()) - datetime.fromisoformat(stare["data"])).days
-        except (KeyError, TypeError, ValueError):
-            dni = 0
+        dni = dni_od(stare.get("data"))
         if dni >= DNI_BEZ_ZMIAN_ALARM:
             print("UWAGA: ceny w źródle nie zmieniły się od %d dni – sprawdź ręcznie, czy AutoCentrum "
                   "nadal aktualizuje dane." % dni, file=sys.stderr)
